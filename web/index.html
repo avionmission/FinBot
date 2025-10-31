@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinBot Chat - Finance Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏦 FinBot Chat</h1>
+            <p>Your AI-powered finance assistant</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        <div class="message-content">
+                            <strong>FinBot:</strong> Hello! I'm your finance assistant. Ask me anything about banking, investments, loans, or financial services.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <div class="input-group">
+                        <input type="text" id="messageInput" placeholder="Ask about finance, banking, investments..." />
+                        <button id="sendButton">Send</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="panel">
+                    <h3>📚 Add Knowledge</h3>
+                    <div class="url-input-group">
+                        <input type="url" id="urlInput" placeholder="Enter URL to financial document..." />
+                        <button id="addUrlButton">Add Document</button>
+                    </div>
+                    <div id="urlStatus" class="status-message"></div>
+                </div>
+                
+                <div class="panel">
+                    <h3>💡 Sample Questions</h3>
+                    <div class="sample-questions">
+                        <button class="sample-btn" data-question="What is a savings account?">What is a savings account?</button>
+                        <button class="sample-btn" data-question="How do I apply for a credit card?">How do I apply for a credit card?</button>
+                        <button class="sample-btn" data-question="What is compound interest?">What is compound interest?</button>
+                        <button class="sample-btn" data-question="How do I check my account balance?">How do I check my balance?</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>
