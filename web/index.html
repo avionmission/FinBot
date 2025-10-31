@@ -1,28 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FinBot Chat - Finance Assistant</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=3">
+    <style>
+        /* Force dark theme and Inter font in case of caching issues */
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+
+        body {
+            background: #1a1a2e !important;
+            color: #e4e6ea !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            font-weight: 600 !important;
+        }
+
+        button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            font-weight: 500 !important;
+        }
+
+        input {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+    </style>
 </head>
+
 <body>
     <div class="container">
         <header>
-            <h1>🏦 FinBot Chat</h1>
+            <h1>💳 FinBot Chat</h1>
             <p>Your AI-powered finance assistant</p>
         </header>
-        
+
         <div class="main-content">
             <div class="chat-container">
                 <div class="chat-messages" id="chatMessages">
                     <div class="message bot-message">
                         <div class="message-content">
-                            <strong>FinBot:</strong> Hello! I'm your finance assistant. Ask me anything about banking, investments, loans, or financial services.
+                            <strong>FinBot:</strong> Hello! I'm your finance assistant. Ask me anything about banking,
+                            investments, loans, or financial services.
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="chat-input-container">
                     <div class="input-group">
                         <input type="text" id="messageInput" placeholder="Ask about finance, banking, investments..." />
@@ -30,30 +67,76 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="sidebar">
                 <div class="panel">
-                    <h3>📚 Add Knowledge</h3>
-                    <div class="url-input-group">
-                        <input type="url" id="urlInput" placeholder="Enter URL to financial document..." />
-                        <button id="addUrlButton">Add Document</button>
+                    <h3>Settings</h3>
+                    <div class="settings-section">
+                        <h4>Gemini API Key</h4>
+                        <div class="api-key-group">
+                            <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key..." />
+                            <button id="saveApiKeyButton">Save</button>
+                        </div>
+                        <div id="apiKeyStatus" class="status-message"></div>
+                        <small>Get your API key from <a href="https://makersuite.google.com/app/apikey"
+                                target="_blank">Google AI Studio</a></small>
                     </div>
-                    <div id="urlStatus" class="status-message"></div>
                 </div>
-                
+
                 <div class="panel">
-                    <h3>💡 Sample Questions</h3>
-                    <div class="sample-questions">
-                        <button class="sample-btn" data-question="What is a savings account?">What is a savings account?</button>
-                        <button class="sample-btn" data-question="How do I apply for a credit card?">How do I apply for a credit card?</button>
-                        <button class="sample-btn" data-question="What is compound interest?">What is compound interest?</button>
-                        <button class="sample-btn" data-question="How do I check my account balance?">How do I check my balance?</button>
+                    <h3>Add Knowledge</h3>
+
+                    <div class="upload-section">
+                        <h4>Upload Files</h4>
+                        <div class="file-upload-area" id="fileUploadArea">
+                            <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.txt" multiple style="display: none;">
+                            <div class="upload-placeholder">
+                                <div class="upload-icon">+</div>
+                                <span>Click or drag files here</span>
+                                <small>PDF, Excel, or TXT files</small>
+                            </div>
+                        </div>
+                        <div id="fileStatus" class="status-message"></div>
                     </div>
+
+                    <div class="url-section">
+                        <h4>Add from URL</h4>
+                        <div class="url-input-group">
+                            <input type="url" id="urlInput" placeholder="Enter URL to financial document..." />
+                            <button id="addUrlButton">Add Document</button>
+                        </div>
+                        <div id="urlStatus" class="status-message"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Knowledge Base</h3>
+                    <div id="documentsList" class="documents-list">
+                        <div class="loading-docs">Loading documents...</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Sample Questions</h3>
+                    <div class="sample-questions">
+                        <button class="sample-btn" data-question="What is a savings account?">What is a savings
+                            account?</button>
+                        <button class="sample-btn" data-question="How do I apply for a credit card?">How do I apply for
+                            a credit card?</button>
+                        <button class="sample-btn" data-question="What is compound interest?">What is compound
+                            interest?</button>
+                        <button class="sample-btn" data-question="How do I check my account balance?">How do I check my
+                            balance?</button>
+                    </div>
+                </div>
+            </div>
                 </div>
             </div>
         </div>
     </div>
-    
+    </div>
+
     <script src="/static/script.js"></script>
 </body>
+
 </html>

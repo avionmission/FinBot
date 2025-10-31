@@ -16,7 +16,7 @@ A domain-specific AI assistant for finance that answers customer queries using R
 - **Backend**: Python, FastAPI, LangChain
 - **Vector Database**: FAISS
 - **Embeddings**: SentenceTransformers (all-MiniLM-L6-v2)
-- **LLM**: OpenAI GPT (configurable)
+- **LLM**: Google Gemini Pro
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **Document Processing**: BeautifulSoup, requests
 
@@ -24,24 +24,35 @@ A domain-specific AI assistant for finance that answers customer queries using R
 
 1. **Clone and setup**:
    ```bash
-   git clone <repository>
+   git clone https://github.com/avionmission/FinBot
    cd finbot-chat
+   python -m venv venv
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-2. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your OpenAI API key
-   ```
-
-3. **Run the application**:
+2. **Run the application**:
    ```bash
    python -m app.main
    ```
+   
+   Or using uvicorn directly:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
 
-4. **Open your browser**:
-   Navigate to `http://localhost:8000`
+3. **Open your browser and configure**:
+   - Navigate to `http://localhost:8000`
+   - In the Settings panel, enter your Google Gemini API key
+   - Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Click "Save API Key" to start using the bot
+
+   **Alternative**: You can also create a `.env` file with your API key:
+   ```bash
+   GOOGLE_API_KEY="your_api_key_here"
+   FAISS_INDEX_PATH=./data/faiss_index
+   DOCUMENTS_PATH=./data/documents
+   ```
 
 ## API Endpoints
 
@@ -70,10 +81,8 @@ Use the sidebar to add financial documents from URLs:
 ```
 finbot-chat/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py              # FastAPI application
 │   └── services/
-│       ├── __init__.py
 │       ├── rag_service.py   # RAG implementation
 │       └── document_service.py  # Document processing
 ├── web/
@@ -82,14 +91,14 @@ finbot-chat/
 │   └── script.js           # Frontend logic
 ├── data/                   # Vector store data (auto-created)
 ├── requirements.txt
-├── .env.example
+├── .env                    # Environment configuration
 └── README.md
 ```
 
 ## Configuration
 
 ### Environment Variables
-- `OPENAI_API_KEY`: Your OpenAI API key
+- `GOOGLE_API_KEY`: Your Google Gemini API key (get it from Google AI Studio)
 - `FAISS_INDEX_PATH`: Path to FAISS index files (default: ./data/faiss_index)
 - `DOCUMENTS_PATH`: Path to document storage (default: ./data/documents)
 
@@ -112,6 +121,9 @@ finbot-chat/
 curl -X POST "http://localhost:8000/api/query" \
      -H "Content-Type: application/json" \
      -d '{"question": "What is compound interest?"}'
+
+# Check if the server is running
+curl http://localhost:8000/api/health
 ```
 
 ## Deployment
@@ -133,6 +145,34 @@ CMD ["python", "-m", "app.main"]
 - Configure CORS for your domain
 - Use environment-specific configurations
 - Consider using a more robust vector database for scale
+
+## Troubleshooting
+
+### Installation Issues
+If you encounter dependency installation errors:
+```bash
+# Make sure you're in a virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Upgrade pip first
+pip install --upgrade pip
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### API Key Issues
+- Enter your API key in the Settings panel on the web interface, or
+- Create a `.env` file with `GOOGLE_API_KEY="your_key_here"`
+- Get your key from: https://makersuite.google.com/app/apikey
+- Ensure the key has proper permissions for Gemini API
+
+### Common Errors
+- **"GOOGLE_API_KEY not set"**: Enter your API key in the Settings panel or create a `.env` file
+- **"Module not found"**: Make sure virtual environment is activated
+- **Port already in use**: Use a different port with `--port 8001` or kill existing process
+- **Import errors**: Ensure all dependencies are installed with `pip install -r requirements.txt`
 
 ## Contributing
 

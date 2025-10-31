@@ -6,8 +6,17 @@ class FinBotChat {
         this.urlInput = document.getElementById('urlInput');
         this.addUrlButton = document.getElementById('addUrlButton');
         this.urlStatus = document.getElementById('urlStatus');
+        this.fileInput = document.getElementById('fileInput');
+        this.fileUploadArea = document.getElementById('fileUploadArea');
+        this.fileStatus = document.getElementById('fileStatus');
+        this.documentsList = document.getElementById('documentsList');
+        this.apiKeyInput = document.getElementById('apiKeyInput');
+        this.saveApiKeyButton = document.getElementById('saveApiKeyButton');
+        this.apiKeyStatus = document.getElementById('apiKeyStatus');
         
         this.initializeEventListeners();
+        this.loadApiKey();
+        this.loadDocuments();
     }
     
     initializeEventListeners() {
@@ -24,6 +33,15 @@ class FinBotChat {
         // Add document from URL
         this.addUrlButton.addEventListener('click', () => this.addDocumentFromUrl());
         
+        // File upload events
+        this.fileUploadArea.addEventListener('click', () => this.fileInput.click());
+        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        
+        // Drag and drop events
+        this.fileUploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
+        this.fileUploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+        this.fileUploadArea.addEventListener('drop', (e) => this.handleFileDrop(e));
+        
         // Sample question buttons
         document.querySelectorAll('.sample-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -32,11 +50,21 @@ class FinBotChat {
                 this.sendMessage();
             });
         });
+        
+        // API key management
+        this.saveApiKeyButton.addEventListener('click', () => this.saveApiKey());
     }
     
     async sendMessage() {
         const message = this.messageInput.value.trim();
         if (!message) return;
+        
+        // Check if API key is set
+        const apiKey = this.getApiKey();
+        if (!apiKey) {
+            this.addMessage('Please set your Gemini API key in the Settings panel first.', 'bot');
+            return;
+        }
         
         // Add user message to chat
         this.addMessage(message, 'user');
@@ -53,12 +81,14 @@ class FinBotChat {
                 },
                 body: JSON.stringify({
                     question: message,
+                    api_key: apiKey,
                     max_results: 3
                 })
             });
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
             }
             
             const data = await response.json();
@@ -68,7 +98,15 @@ class FinBotChat {
             
         } catch (error) {
             console.error('Error:', error);
-            this.addMessage('Sorry, I encountered an error processing your request. Please try again.', 'bot');
+            let errorMessage = 'Sorry, I encountered an error processing your request.';
+            
+            if (error.message.includes('API key')) {
+                errorMessage = 'Invalid API key. Please check your Gemini API key in Settings.';
+            } else if (error.message.includes('quota')) {
+                errorMessage = 'API quota exceeded. Please check your Gemini API usage.';
+            }
+            
+            this.addMessage(errorMessage, 'bot');
         } finally {
             this.setLoading(false);
         }
@@ -85,9 +123,9 @@ class FinBotChat {
             const response = await fetch('/api/documents/add-url', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/json',
                 },
-                body: `url=${encodeURIComponent(url)}`
+                body: JSON.stringify({ url: url })
             });
             
             if (!response.ok) {
@@ -175,6 +213,154 @@ class FinBotChat {
     
     scrollToBottom() {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+    }
+    
+    // File upload methods
+    handleFileSelect(event) {
+        const files = event.target.files;
+        this.uploadFiles(files);
+    }
+    
+    handleDragOver(event) {
+        event.preventDefault();
+        this.fileUploadArea.classList.add('dragover');
+    }
+    
+    handleDragLeave(event) {
+        event.preventDefault();
+        this.fileUploadArea.classList.remove('dragover');
+    }
+    
+    handleFileDrop(event) {
+        event.preventDefault();
+        this.fileUploadArea.classList.remove('dragover');
+        const files = event.dataTransfer.files;
+        this.uploadFiles(files);
+    }
+    
+    async uploadFiles(files) {
+        if (!files || files.length === 0) return;
+        
+        this.showFileStatus('Uploading files...', 'info');
+        
+        for (let file of files) {
+            try {
+                await this.uploadSingleFile(file);
+            } catch (error) {
+                console.error(`Error uploading ${file.name}:`, error);
+                this.showFileStatus(`❌ Failed to upload ${file.name}`, 'error');
+                return;
+            }
+        }
+        
+        this.showFileStatus(`✅ Successfully uploaded ${files.length} file(s)!`, 'success');
+        this.loadDocuments(); // Refresh document list
+        this.fileInput.value = ''; // Clear file input
+    }
+    
+    async uploadSingleFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/documents/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    }
+    
+    async loadDocuments() {
+        try {
+            const response = await fetch('/api/documents');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.displayDocuments(data.documents);
+            
+        } catch (error) {
+            console.error('Error loading documents:', error);
+            this.documentsList.innerHTML = '<div class="no-documents">Failed to load documents</div>';
+        }
+    }
+    
+    displayDocuments(documents) {
+        if (!documents || documents.length === 0) {
+            this.documentsList.innerHTML = '<div class="no-documents">No documents added yet</div>';
+            return;
+        }
+        
+        const documentsHtml = documents.map(doc => `
+            <div class="document-item">
+                <div class="document-name">${doc.name}</div>
+                <div class="document-info">
+                    <span class="document-type">${doc.type}</span>
+                    <span>${doc.chunks} chunks</span>
+                </div>
+            </div>
+        `).join('');
+        
+        this.documentsList.innerHTML = documentsHtml;
+    }
+    
+    showFileStatus(message, type) {
+        this.fileStatus.textContent = message;
+        this.fileStatus.className = `status-message ${type}`;
+        
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                this.fileStatus.textContent = '';
+                this.fileStatus.className = 'status-message';
+            }, 5000);
+        }
+    }
+    
+    // API Key Management
+    saveApiKey() {
+        const apiKey = this.apiKeyInput.value.trim();
+        if (!apiKey) {
+            this.showApiKeyStatus('Please enter an API key', 'error');
+            return;
+        }
+        
+        // Store API key in localStorage
+        localStorage.setItem('gemini_api_key', apiKey);
+        this.showApiKeyStatus('API key saved successfully!', 'success');
+        
+        // Clear the input for security
+        this.apiKeyInput.value = '';
+    }
+    
+    loadApiKey() {
+        const savedApiKey = localStorage.getItem('gemini_api_key');
+        if (savedApiKey) {
+            this.showApiKeyStatus('API key loaded', 'success');
+        } else {
+            this.showApiKeyStatus('Please enter your Gemini API key', 'info');
+        }
+    }
+    
+    getApiKey() {
+        return localStorage.getItem('gemini_api_key');
+    }
+    
+    showApiKeyStatus(message, type) {
+        this.apiKeyStatus.textContent = message;
+        this.apiKeyStatus.className = `status-message ${type}`;
+        
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                this.apiKeyStatus.textContent = '';
+                this.apiKeyStatus.className = 'status-message';
+            }, 3000);
+        }
     }
 }
 

@@ -1,24 +1,53 @@
 import os
 import faiss
 import numpy as np
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.llms import OpenAI
-from langchain.vectorstores import FAISS
+from langchain_google_genai import ChatGoogleGenerativeAI
+# Direct FAISS usage for vector operations
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains import RetrievalQA
 from sentence_transformers import SentenceTransformer
 import pickle
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 load_dotenv()
 
 class RAGService:
     def __init__(self):
         self.embeddings = SentenceTransformer('all-MiniLM-L6-v2')
-        self.llm = OpenAI(temperature=0.7, openai_api_key=os.getenv("OPENAI_API_KEY"))
-        self.vector_store = None
+        
+        # Model preference order for Gemini
+        self.models_to_try = [
+            "models/gemini-2.0-flash",
+            "models/gemini-2.0-flash-001", 
+            "models/gemini-2.5-flash",
+            "models/gemini-flash-latest",
+            "models/gemini-2.0-flash-lite",
+            "models/gemini-2.0-flash-lite-001",
+            "models/gemini-flash-lite-latest",
+            "models/gemini-2.5-pro",
+            "models/gemini-pro-latest"
+        ]
+        
+        # Initialize document metadata storage
         self.documents_metadata = []
         self.load_or_create_index()
+    
+    def _get_llm_with_api_key(self, api_key: str):
+        """Create LLM instance with provided API key"""
+        if not api_key:
+            raise ValueError("API key is required")
+        
+        for model_name in self.models_to_try:
+            try:
+                return ChatGoogleGenerativeAI(
+                    model=model_name,
+                    temperature=0.7,
+                    google_api_key=api_key
+                )
+            except Exception:
+                continue
+        
+        raise ValueError("Could not initialize any Gemini model. Please check your API key.")
     
     def load_or_create_index(self):
         """Load existing FAISS index or create new one"""
@@ -30,13 +59,7 @@ class RAGService:
             with open(f"{index_path}_metadata.pkl", 'rb') as f:
                 self.documents_metadata = pickle.load(f)
             
-            # Create FAISS vector store wrapper
-            self.vector_store = FAISS(
-                embedding_function=self.embeddings.encode,
-                index=index,
-                docstore={},
-                index_to_docstore_id={}
-            )
+            pass
         else:
             # Create new index with sample financial documents
             self._create_sample_index()
@@ -75,16 +98,10 @@ class RAGService:
         with open(f"{index_path}_metadata.pkl", 'wb') as f:
             pickle.dump(self.documents_metadata, f)
         
-        # Create vector store wrapper
-        self.vector_store = FAISS(
-            embedding_function=self.embeddings.encode,
-            index=index,
-            docstore={},
-            index_to_docstore_id={}
-        )
+        # FAISS operations handled manually with SentenceTransformers
     
-    async def query(self, question: str, max_results: int = 3):
-        """Process query using RAG"""
+    async def query(self, question: str, api_key: str, max_results: int = 3):
+        """Process query using RAG with provided API key"""
         # Get query embedding
         query_embedding = self.embeddings.encode([question])
         
@@ -119,20 +136,39 @@ class RAGService:
         """
         
         try:
-            response = self.llm(prompt)
+            # Create LLM instance with provided API key
+            llm = self._get_llm_with_api_key(api_key)
+            
+            # Generate response using Gemini
+            response = llm.invoke(prompt)
+            
+            # Extract content from response
+            if hasattr(response, 'content'):
+                answer = response.content
+            else:
+                answer = str(response)
+            
             confidence = float(np.mean(scores[0])) if len(scores[0]) > 0 else 0.0
             
             return {
-                "answer": response.strip(),
+                "answer": answer.strip(),
                 "sources": sources,
                 "confidence": confidence
             }
         except Exception as e:
-            return {
-                "answer": f"I apologize, but I encountered an error processing your question: {str(e)}",
-                "sources": [],
-                "confidence": 0.0
-            }
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower():
+                return {
+                    "answer": "I'm currently experiencing high demand and have reached my API quota limit. Please try again in a few minutes. In the meantime, here's what I found in the knowledge base: " + context[:200] + "...",
+                    "sources": sources,
+                    "confidence": confidence if 'confidence' in locals() else 0.0
+                }
+            else:
+                return {
+                    "answer": f"I apologize, but I encountered an error processing your question: {error_msg}",
+                    "sources": [],
+                    "confidence": 0.0
+                }
     
     def add_documents(self, documents: list[str], sources: list[str]):
         """Add new documents to the index"""
