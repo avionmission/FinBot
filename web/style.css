@@ -384,6 +384,21 @@ button:disabled {
     text-decoration: underline;
 }
 
+.privacy-notice {
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: rgba(72, 187, 120, 0.1);
+    border: 1px solid rgba(72, 187, 120, 0.3);
+    border-radius: 6px;
+}
+
+.privacy-notice small {
+    color: #68d391;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
 .sample-questions {
     display: flex;
     flex-direction: column;

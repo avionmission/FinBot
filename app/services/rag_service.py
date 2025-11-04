@@ -11,8 +11,12 @@ import google.generativeai as genai
 
 load_dotenv()
 
+# Global storage for session-based knowledge bases
+SESSION_STORES = {}
+
 class RAGService:
-    def __init__(self):
+    def __init__(self, session_id: str = "default"):
+        self.session_id = session_id
         self.embeddings = SentenceTransformer('all-MiniLM-L6-v2')
         
         # Model preference order for Gemini
@@ -28,9 +32,8 @@ class RAGService:
             "models/gemini-pro-latest"
         ]
         
-        # Initialize document metadata storage
-        self.documents_metadata = []
-        self.load_or_create_index()
+        # Initialize session-specific storage
+        self.init_session_store()
     
     def _get_llm_with_api_key(self, api_key: str):
         """Create LLM instance with provided API key"""
@@ -49,23 +52,42 @@ class RAGService:
         
         raise ValueError("Could not initialize any Gemini model. Please check your API key.")
     
-    def load_or_create_index(self):
-        """Load existing FAISS index or create new one"""
-        index_path = os.getenv("FAISS_INDEX_PATH", "./data/faiss_index")
+    def init_session_store(self):
+        """Initialize session-specific storage"""
+        if self.session_id not in SESSION_STORES:
+            SESSION_STORES[self.session_id] = {
+                'index': None,
+                'documents_metadata': [],
+                'initialized': False
+            }
         
-        if os.path.exists(f"{index_path}.faiss") and os.path.exists(f"{index_path}_metadata.pkl"):
-            # Load existing index
-            index = faiss.read_index(f"{index_path}.faiss")
-            with open(f"{index_path}_metadata.pkl", 'rb') as f:
-                self.documents_metadata = pickle.load(f)
-            
-            pass
-        else:
-            # Create new index with sample financial documents
+        # Create sample index for new sessions
+        if not SESSION_STORES[self.session_id]['initialized']:
             self._create_sample_index()
+            SESSION_STORES[self.session_id]['initialized'] = True
+    
+    @property
+    def documents_metadata(self):
+        """Get documents metadata for current session"""
+        return SESSION_STORES[self.session_id]['documents_metadata']
+    
+    @documents_metadata.setter
+    def documents_metadata(self, value):
+        """Set documents metadata for current session"""
+        SESSION_STORES[self.session_id]['documents_metadata'] = value
+    
+    @property
+    def index(self):
+        """Get FAISS index for current session"""
+        return SESSION_STORES[self.session_id]['index']
+    
+    @index.setter
+    def index(self, value):
+        """Set FAISS index for current session"""
+        SESSION_STORES[self.session_id]['index'] = value
     
     def _create_sample_index(self):
-        """Create initial index with sample financial FAQs"""
+        """Create initial in-memory index with sample financial FAQs"""
         sample_docs = [
             "What is a savings account? A savings account is a deposit account that earns interest and provides easy access to your money.",
             "How do I apply for a credit card? You can apply for a credit card online, by phone, or at a branch location.",
@@ -82,34 +104,29 @@ class RAGService:
         # Create embeddings
         embeddings = self.embeddings.encode(sample_docs)
         
-        # Create FAISS index
+        # Create in-memory FAISS index
         dimension = embeddings.shape[1]
         index = faiss.IndexFlatIP(dimension)
         index.add(embeddings.astype('float32'))
         
-        # Store metadata
+        # Store in session
+        self.index = index
         self.documents_metadata = [{"text": doc, "source": "FAQ"} for doc in sample_docs]
-        
-        # Save index
-        os.makedirs(os.path.dirname(os.getenv("FAISS_INDEX_PATH", "./data/faiss_index")), exist_ok=True)
-        index_path = os.getenv("FAISS_INDEX_PATH", "./data/faiss_index")
-        faiss.write_index(index, f"{index_path}.faiss")
-        
-        with open(f"{index_path}_metadata.pkl", 'wb') as f:
-            pickle.dump(self.documents_metadata, f)
-        
-        # FAISS operations handled manually with SentenceTransformers
     
     async def query(self, question: str, api_key: str, max_results: int = 3):
         """Process query using RAG with provided API key"""
         # Get query embedding
         query_embedding = self.embeddings.encode([question])
         
-        # Search similar documents
-        index_path = os.getenv("FAISS_INDEX_PATH", "./data/faiss_index")
-        index = faiss.read_index(f"{index_path}.faiss")
+        # Search similar documents in session index
+        if self.index is None:
+            return {
+                "answer": "No documents have been added to your knowledge base yet. Please add some documents first.",
+                "sources": [],
+                "confidence": 0.0
+            }
         
-        scores, indices = index.search(query_embedding.astype('float32'), max_results)
+        scores, indices = self.index.search(query_embedding.astype('float32'), max_results)
         
         # Get relevant documents
         relevant_docs = []
@@ -171,24 +188,39 @@ class RAGService:
                 }
     
     def add_documents(self, documents: list[str], sources: list[str]):
-        """Add new documents to the index"""
+        """Add new documents to the session index"""
+        print(f"[RAG_SERVICE] Adding {len(documents)} documents to session {self.session_id}")
+        
         # Create embeddings for new documents
         new_embeddings = self.embeddings.encode(documents)
+        print(f"[RAG_SERVICE] Created embeddings shape: {new_embeddings.shape}")
         
-        # Load existing index
-        index_path = os.getenv("FAISS_INDEX_PATH", "./data/faiss_index")
-        index = faiss.read_index(f"{index_path}.faiss")
+        # Add new embeddings to session index
+        if self.index is None:
+            # Create new index if none exists
+            dimension = new_embeddings.shape[1]
+            self.index = faiss.IndexFlatIP(dimension)
+            print(f"[RAG_SERVICE] Created new FAISS index with dimension {dimension}")
         
-        # Add new embeddings
-        index.add(new_embeddings.astype('float32'))
+        self.index.add(new_embeddings.astype('float32'))
+        print(f"[RAG_SERVICE] Added embeddings to index. Total vectors: {self.index.ntotal}")
         
-        # Update metadata
+        # Update session metadata
+        current_metadata = self.documents_metadata
         for doc, source in zip(documents, sources):
-            self.documents_metadata.append({"text": doc, "source": source})
-        
-        # Save updated index
-        faiss.write_index(index, f"{index_path}.faiss")
-        with open(f"{index_path}_metadata.pkl", 'wb') as f:
-            pickle.dump(self.documents_metadata, f)
+            current_metadata.append({"text": doc, "source": source})
+        self.documents_metadata = current_metadata
+        print(f"[RAG_SERVICE] Updated metadata. Total documents: {len(self.documents_metadata)}")
         
         return len(documents)
+    
+    @classmethod
+    def clear_session(cls, session_id: str):
+        """Clear all data for a specific session"""
+        if session_id in SESSION_STORES:
+            del SESSION_STORES[session_id]
+    
+    @classmethod
+    def get_active_sessions(cls):
+        """Get list of active session IDs"""
+        return list(SESSION_STORES.keys())

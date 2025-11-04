@@ -16,7 +16,8 @@ except ImportError:
     PDFPLUMBER_AVAILABLE = False
 
 class DocumentService:
-    def __init__(self):
+    def __init__(self, session_id: str = "default"):
+        self.session_id = session_id
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -60,8 +61,8 @@ class DocumentService:
             if not documents:
                 raise ValueError("No meaningful content extracted from URL")
             
-            # Add to RAG service
-            rag_service = RAGService()
+            # Add to RAG service with session ID
+            rag_service = RAGService(self.session_id)
             sources = [url] * len(documents)
             chunks_added = rag_service.add_documents(documents, sources)
             
@@ -84,8 +85,8 @@ class DocumentService:
             if not documents:
                 raise ValueError("No meaningful content in provided text")
             
-            # Add to RAG service
-            rag_service = RAGService()
+            # Add to RAG service with session ID
+            rag_service = RAGService(self.session_id)
             sources = [source] * len(documents)
             chunks_added = rag_service.add_documents(documents, sources)
             
@@ -97,6 +98,7 @@ class DocumentService:
     async def add_from_file(self, file_content: bytes, filename: str, content_type: str):
         """Add document from uploaded file"""
         try:
+            print(f"[DOC_SERVICE] Processing file: {filename}, type: {content_type}, session: {self.session_id}")
             text = ""
             
             if content_type == "application/pdf" or filename.lower().endswith('.pdf'):
@@ -108,26 +110,32 @@ class DocumentService:
             else:
                 raise ValueError(f"Unsupported file type: {content_type}")
             
+            print(f"[DOC_SERVICE] Extracted text length: {len(text)} characters")
+            
             if not text.strip():
                 raise ValueError("No text content found in the file")
             
             # Split text into chunks
             documents = self.text_splitter.split_text(text)
+            print(f"[DOC_SERVICE] Split into {len(documents)} initial chunks")
             
             # Filter out very short chunks
             documents = [doc for doc in documents if len(doc.strip()) > 50]
+            print(f"[DOC_SERVICE] After filtering: {len(documents)} chunks")
             
             if not documents:
                 raise ValueError("No meaningful content extracted from file")
             
-            # Add to RAG service
-            rag_service = RAGService()
+            # Add to RAG service with session ID
+            rag_service = RAGService(self.session_id)
             sources = [filename] * len(documents)
             chunks_added = rag_service.add_documents(documents, sources)
+            print(f"[DOC_SERVICE] Added {chunks_added} chunks to RAG service")
             
             return chunks_added
             
         except Exception as e:
+            print(f"[DOC_SERVICE ERROR] {str(e)}")
             raise Exception(f"Failed to process file: {str(e)}")
     
     def _extract_pdf_text(self, file_content: bytes) -> str:
@@ -230,9 +238,9 @@ class DocumentService:
             raise Exception(f"Failed to extract Excel text: {str(e)}")
     
     def get_document_sources(self) -> List[Dict]:
-        """Get list of all document sources in the knowledge base"""
+        """Get list of all document sources in the session knowledge base"""
         try:
-            rag_service = RAGService()
+            rag_service = RAGService(self.session_id)
             
             # Get unique sources from metadata
             sources = {}
