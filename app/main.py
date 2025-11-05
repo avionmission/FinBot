@@ -249,6 +249,14 @@ async def clear_session(session_id: str):
 async def health_check():
     return {"status": "healthy", "service": "FinBot Chat"}
 
+@app.on_event("startup")
+async def startup_event():
+    """Print startup information"""
+    port = os.environ.get("PORT", "8000")
+    print(f"🚀 FinBot Chat starting up...")
+    print(f"🌐 Server binding to port: {port}")
+    print(f"📚 Session-based knowledge isolation enabled")
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
