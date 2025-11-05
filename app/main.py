@@ -23,12 +23,7 @@ app.add_middleware(
 # Serve static web files
 app.mount("/static", StaticFiles(directory="web"), name="static")
 
-@app.on_event("startup")
-async def startup_event():
-    """Print startup information"""
-    port = os.environ.get("PORT", "8000")
-    print(f"🚀 FinBot Chat starting on port {port}")
-    print("📚 Session-based knowledge isolation enabled")
+
 
 def get_session_id(x_session_id: Optional[str] = Header(None)) -> str:
     """Get or create session ID"""
@@ -254,8 +249,9 @@ async def startup_event():
     """Print startup information"""
     port = os.environ.get("PORT", "8000")
     print(f"🚀 FinBot Chat starting up...")
-    print(f"🌐 Server binding to port: {port}")
+    print(f"🌐 Server will bind to 0.0.0.0:{port}")
     print(f"📚 Session-based knowledge isolation enabled")
+    print(f"✅ Application ready to receive requests")
 
 if __name__ == "__main__":
     import uvicorn

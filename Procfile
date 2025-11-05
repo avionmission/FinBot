@@ -1,1 +1,1 @@
-web: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+web: python health_check.py && echo "Starting on port $PORT" && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --log-level info
